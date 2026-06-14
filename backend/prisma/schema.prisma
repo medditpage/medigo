@@ -1,0 +1,487 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ============================================================
+// ENUMS
+// ============================================================
+
+enum UserRole {
+  patient
+  agent
+  admin
+
+  @@map("user_role")
+}
+
+enum AgentStatus {
+  pending
+  approved
+  rejected
+  banned
+
+  @@map("agent_status")
+}
+
+enum OrderStatus {
+  pending
+  assigned
+  accepted
+  purchasing
+  bill_uploaded
+  out_for_delivery
+  delivered
+  cancelled
+  expired
+
+  @@map("order_status")
+}
+
+enum PaymentStatus {
+  pending
+  paid
+
+  @@map("payment_status")
+}
+
+enum ComplaintCategory {
+  wrong_medicine
+  missing_medicine
+  damaged_product
+  late_delivery
+  overcharging
+  other
+
+  @@map("complaint_category")
+}
+
+enum ComplaintStatus {
+  open
+  in_progress
+  resolved
+
+  @@map("complaint_status")
+}
+
+enum PayoutStatus {
+  pending
+  paid
+
+  @@map("payout_status")
+}
+
+enum NotificationType {
+  registration
+  order_placed
+  order_accepted
+  bill_generated
+  out_for_delivery
+  delivered
+  complaint
+  general
+
+  @@map("notification_type")
+}
+
+enum OrderMethod {
+  prescription
+  manual
+
+  @@map("order_method")
+}
+
+enum AssignmentStatus {
+  broadcast
+  accepted
+  expired
+  rejected
+
+  @@map("assignment_status")
+}
+
+// ============================================================
+// MODELS
+// ============================================================
+
+model User {
+  id        String   @id @default(uuid()) @db.Uuid
+  role      UserRole @default(patient)
+  fullName  String   @map("full_name")
+  mobile    String   @unique
+  email     String   @unique
+  language  String   @default("en")
+  isBanned  Boolean  @default(false) @map("is_banned")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  addresses          Address[]
+  familyMembers      FamilyMember[]
+  deliveryAgent      DeliveryAgent?
+  ordersAsPatient    Order[]         @relation("PatientOrders")
+  notifications      Notification[]
+  complaints         Complaint[]     @relation("ComplaintUser")
+  resolvedComplaints Complaint[]     @relation("ComplaintResolver")
+  emailLogs          EmailLog[]
+  ratingsGiven       OrderRating[]
+  auditLogs          AuditLog[]
+  approvedAgents     DeliveryAgent[] @relation("AgentApprover")
+
+  @@map("users")
+}
+
+model Address {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  label       String   @default("home")
+  addressLine String   @map("address_line")
+  city        String
+  state       String
+  pincode     String
+  latitude    Float?
+  longitude   Float?
+  isDefault   Boolean  @default(false) @map("is_default")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orders Order[]
+
+  @@map("addresses")
+}
+
+model FamilyMember {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  fullName  String   @map("full_name")
+  relation  String
+  age       Int?
+  mobile    String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orders Order[]
+
+  @@map("family_members")
+}
+
+model DeliveryAgent {
+  id                String      @id @default(uuid()) @db.Uuid
+  userId            String      @unique @map("user_id") @db.Uuid
+  aadhaarNumber     String      @unique @map("aadhaar_number")
+  aadhaarImageUrl   String      @map("aadhaar_image_url")
+  profilePhotoUrl   String?     @map("profile_photo_url")
+  vehicleType       String      @map("vehicle_type")
+  vehicleNumber     String      @map("vehicle_number")
+  status            AgentStatus @default(pending)
+  isOnline          Boolean     @default(false) @map("is_online")
+  currentLatitude   Float?      @map("current_latitude")
+  currentLongitude  Float?      @map("current_longitude")
+  ratingAvg         Decimal     @default(0) @map("rating_avg") @db.Decimal(3, 2)
+  ratingCount       Int         @default(0) @map("rating_count")
+  totalDeliveries   Int         @default(0) @map("total_deliveries")
+  approvedBy        String?     @map("approved_by") @db.Uuid
+  approvedAt        DateTime?   @map("approved_at")
+  createdAt         DateTime    @default(now()) @map("created_at")
+  updatedAt         DateTime    @updatedAt @map("updated_at")
+
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  approver    User?          @relation("AgentApprover", fields: [approvedBy], references: [id])
+  orders      Order[]
+  assignments OrderAssignment[]
+  earnings    AgentEarning[]
+  ratings     OrderRating[]
+
+  @@map("delivery_agents")
+}
+
+model MedicalStore {
+  id            String    @id @default(uuid()) @db.Uuid
+  name          String
+  ownerName     String?   @map("owner_name")
+  phone         String
+  addressLine   String    @map("address_line")
+  city          String
+  state         String
+  pincode       String
+  latitude      Float
+  longitude     Float
+  licenseNumber String?   @map("license_number")
+  isActive      Boolean   @default(true) @map("is_active")
+  opensAt       DateTime? @map("opens_at") @db.Time
+  closesAt      DateTime? @map("closes_at") @db.Time
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  orders Order[]
+
+  @@map("medical_stores")
+}
+
+model DeliveryChargeRule {
+  id             String   @id @default(uuid()) @db.Uuid
+  minDistanceKm  Decimal  @map("min_distance_km") @db.Decimal(6, 2)
+  maxDistanceKm  Decimal  @map("max_distance_km") @db.Decimal(6, 2)
+  charge         Decimal  @db.Decimal(8, 2)
+  isActive       Boolean  @default(true) @map("is_active")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@map("delivery_charge_rules")
+}
+
+model AppSetting {
+  key         String   @id
+  value       String
+  description String?
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("app_settings")
+}
+
+model Order {
+  id                     String        @id @default(uuid()) @db.Uuid
+  orderNumber            String        @unique @map("order_number")
+  patientId              String        @map("patient_id") @db.Uuid
+  familyMemberId         String?       @map("family_member_id") @db.Uuid
+  storeId                String?       @map("store_id") @db.Uuid
+  agentId                String?       @map("agent_id") @db.Uuid
+  addressId              String        @map("address_id") @db.Uuid
+
+  orderMethod            OrderMethod   @map("order_method")
+  prescriptionImageUrls  String[]      @map("prescription_image_urls")
+  notes                  String?
+
+  isUrgent               Boolean       @default(false) @map("is_urgent")
+
+  deliveryLatitude       Float         @map("delivery_latitude")
+  deliveryLongitude      Float         @map("delivery_longitude")
+
+  distanceKm             Decimal?      @map("distance_km") @db.Decimal(8, 2)
+
+  status                 OrderStatus   @default(pending)
+  paymentStatus          PaymentStatus @default(pending) @map("payment_status")
+
+  medicineCost           Decimal?      @map("medicine_cost") @db.Decimal(10, 2)
+  deliveryCharge         Decimal?      @map("delivery_charge") @db.Decimal(10, 2)
+  baseCharge             Decimal       @default(0) @map("base_charge") @db.Decimal(10, 2)
+  platformCharge         Decimal       @default(0) @map("platform_charge") @db.Decimal(10, 2)
+  urgentCharge           Decimal       @default(0) @map("urgent_charge") @db.Decimal(10, 2)
+  taxAmount              Decimal       @default(0) @map("tax_amount") @db.Decimal(10, 2)
+  totalAmount            Decimal?      @map("total_amount") @db.Decimal(10, 2)
+
+  billImageUrl           String?       @map("bill_image_url")
+
+  createdAt              DateTime      @default(now()) @map("created_at")
+  updatedAt              DateTime      @updatedAt @map("updated_at")
+  acceptedAt             DateTime?     @map("accepted_at")
+  deliveredAt            DateTime?     @map("delivered_at")
+  cancelledAt            DateTime?     @map("cancelled_at")
+
+  patient       User              @relation("PatientOrders", fields: [patientId], references: [id], onDelete: Cascade)
+  familyMember  FamilyMember?     @relation(fields: [familyMemberId], references: [id])
+  store         MedicalStore?     @relation(fields: [storeId], references: [id])
+  agent         DeliveryAgent?    @relation(fields: [agentId], references: [id])
+  address       Address           @relation(fields: [addressId], references: [id])
+
+  items          OrderItem[]
+  assignments    OrderAssignment[]
+  statusHistory  OrderStatusHistory[]
+  invoice        Invoice?
+  rating         OrderRating?
+  earning        AgentEarning?
+  complaints     Complaint[]
+  notifications  Notification[]
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id           String   @id @default(uuid()) @db.Uuid
+  orderId      String   @map("order_id") @db.Uuid
+  medicineName String   @map("medicine_name")
+  quantity     Int      @default(1)
+  unitPrice    Decimal? @map("unit_price") @db.Decimal(10, 2)
+  imageUrl     String?  @map("image_url")
+  notes        String?
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@map("order_items")
+}
+
+model OrderAssignment {
+  id          String           @id @default(uuid()) @db.Uuid
+  orderId     String           @map("order_id") @db.Uuid
+  agentId     String           @map("agent_id") @db.Uuid
+  status      AssignmentStatus @default(broadcast)
+  distanceKm  Decimal?         @map("distance_km") @db.Decimal(8, 2)
+  broadcastAt DateTime         @default(now()) @map("broadcast_at")
+  respondedAt DateTime?        @map("responded_at")
+  expiresAt   DateTime         @map("expires_at")
+
+  order Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  agent DeliveryAgent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@unique([orderId, agentId])
+  @@map("order_assignments")
+}
+
+model OrderStatusHistory {
+  id        String      @id @default(uuid()) @db.Uuid
+  orderId   String      @map("order_id") @db.Uuid
+  status    OrderStatus
+  actorId   String?     @map("actor_id") @db.Uuid
+  actorRole UserRole?   @map("actor_role")
+  note      String?
+  createdAt DateTime    @default(now()) @map("created_at")
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@map("order_status_history")
+}
+
+model Invoice {
+  id              String   @id @default(uuid()) @db.Uuid
+  orderId         String   @unique @map("order_id") @db.Uuid
+  invoiceNumber   String   @unique @map("invoice_number")
+  medicineCost    Decimal  @map("medicine_cost") @db.Decimal(10, 2)
+  deliveryCharge  Decimal  @map("delivery_charge") @db.Decimal(10, 2)
+  baseCharge      Decimal  @default(0) @map("base_charge") @db.Decimal(10, 2)
+  platformCharge  Decimal  @default(0) @map("platform_charge") @db.Decimal(10, 2)
+  urgentCharge    Decimal  @default(0) @map("urgent_charge") @db.Decimal(10, 2)
+  taxAmount       Decimal  @default(0) @map("tax_amount") @db.Decimal(10, 2)
+  totalAmount     Decimal  @map("total_amount") @db.Decimal(10, 2)
+  pdfUrl          String?  @map("pdf_url")
+  htmlContent     String?  @map("html_content")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@map("invoices")
+}
+
+model OrderRating {
+  id        String   @id @default(uuid()) @db.Uuid
+  orderId   String   @unique @map("order_id") @db.Uuid
+  patientId String   @map("patient_id") @db.Uuid
+  agentId   String   @map("agent_id") @db.Uuid
+  rating    Int
+  review    String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  order   Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  patient User          @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  agent   DeliveryAgent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@map("order_ratings")
+}
+
+model Complaint {
+  id             String            @id @default(uuid()) @db.Uuid
+  ticketNumber   String            @unique @map("ticket_number")
+  orderId        String?           @map("order_id") @db.Uuid
+  userId         String            @map("user_id") @db.Uuid
+  category       ComplaintCategory
+  subject        String
+  description    String
+  status         ComplaintStatus   @default(open)
+  adminResponse  String?           @map("admin_response")
+  resolvedBy     String?           @map("resolved_by") @db.Uuid
+  resolvedAt     DateTime?         @map("resolved_at")
+  createdAt      DateTime          @default(now()) @map("created_at")
+  updatedAt      DateTime          @updatedAt @map("updated_at")
+
+  order    Order? @relation(fields: [orderId], references: [id])
+  user     User   @relation("ComplaintUser", fields: [userId], references: [id], onDelete: Cascade)
+  resolver User?  @relation("ComplaintResolver", fields: [resolvedBy], references: [id])
+
+  @@map("complaints")
+}
+
+model Notification {
+  id        String           @id @default(uuid()) @db.Uuid
+  userId    String           @map("user_id") @db.Uuid
+  type      NotificationType
+  title     String
+  message   String
+  orderId   String?          @map("order_id") @db.Uuid
+  isRead    Boolean          @default(false) @map("is_read")
+  createdAt DateTime         @default(now()) @map("created_at")
+
+  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  order Order? @relation(fields: [orderId], references: [id])
+
+  @@map("notifications")
+}
+
+model EmailLog {
+  id               String            @id @default(uuid()) @db.Uuid
+  userId           String?           @map("user_id") @db.Uuid
+  toEmail          String            @map("to_email")
+  subject          String
+  body             String?
+  notificationType NotificationType? @map("notification_type")
+  status           String            @default("sent")
+  errorMessage     String?           @map("error_message")
+  createdAt        DateTime          @default(now()) @map("created_at")
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@map("email_logs")
+}
+
+model AgentEarning {
+  id          String       @id @default(uuid()) @db.Uuid
+  agentId     String       @map("agent_id") @db.Uuid
+  orderId     String       @unique @map("order_id") @db.Uuid
+  amount      Decimal      @db.Decimal(10, 2)
+  payoutStatus PayoutStatus @default(pending) @map("payout_status")
+  paidAt      DateTime?    @map("paid_at")
+  createdAt   DateTime     @default(now()) @map("created_at")
+
+  agent DeliveryAgent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  order Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  transactionRef String? @map("transaction_ref") @db.VarChar(255)
+
+  @@map("agent_earnings")
+}
+
+model DailyMetric {
+  id                         String   @id @default(uuid()) @db.Uuid
+  metricDate                 DateTime @unique @map("metric_date") @db.Date
+  totalOrders                Int      @default(0) @map("total_orders")
+  deliveredOrders            Int      @default(0) @map("delivered_orders")
+  cancelledOrders            Int      @default(0) @map("cancelled_orders")
+  totalRevenue               Decimal  @default(0) @map("total_revenue") @db.Decimal(12, 2)
+  deliveryChargesCollected   Decimal  @default(0) @map("delivery_charges_collected") @db.Decimal(12, 2)
+  platformChargesCollected   Decimal  @default(0) @map("platform_charges_collected") @db.Decimal(12, 2)
+  newPatients                Int      @default(0) @map("new_patients")
+  newAgents                  Int      @default(0) @map("new_agents")
+  activeAgents               Int      @default(0) @map("active_agents")
+  createdAt                  DateTime @default(now()) @map("created_at")
+  updatedAt                  DateTime @updatedAt @map("updated_at")
+
+  @@map("daily_metrics")
+}
+
+model AuditLog {
+  id         String    @id @default(uuid()) @db.Uuid
+  actorId    String?   @map("actor_id") @db.Uuid
+  actorRole  UserRole? @map("actor_role")
+  action     String
+  entityType String    @map("entity_type")
+  entityId   String?   @map("entity_id") @db.Uuid
+  oldValue   Json?     @map("old_value")
+  newValue   Json?     @map("new_value")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  actor User? @relation(fields: [actorId], references: [id])
+
+  @@map("audit_logs")
+}
