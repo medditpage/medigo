@@ -3,9 +3,10 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { v4 as uuidv4 } from 'uuid';
+import { supabase } from "@/lib/supabase";
 import { useAuth } from '@/hooks/useAuth';
 import { useLanguage } from '@/hooks/useLanguage';
-import api, { getErrorMessage, uploadFileToStorage } from '@/lib/api';
+import api, { getErrorMessage } from '@/lib/api';
 import { Order } from '@/types';
 import StatusBadge from '@/components/StatusBadge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -41,7 +42,7 @@ export default function AgentOrderDetailPage() {
 
   const [billDialogOpen, setBillDialogOpen] = useState(false);
   const [billFile, setBillFile] = useState<File | null>(null);
-  const [medicineCost, setMedicineCost] = useState('');
+  const [medicineCost, setMedicineCost] = useState("");
   const [uploadingBill, setUploadingBill] = useState(false);
 
   const fetchOrder = useCallback(async () => {
@@ -129,7 +130,7 @@ export default function AgentOrderDetailPage() {
   if (!order) return null;
 
   const transition = TRANSITIONS[order.status];
-  const showBillUpload = order.status === 'purchasing';
+  const showBillUpload = order.status === "purchasing";
   const mapUrl = `https://www.google.com/maps/dir/?api=1&destination=${order.deliveryLatitude},${order.deliveryLongitude}`;
 
   return (

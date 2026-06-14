@@ -36,7 +36,7 @@ export function useAuth() {
     };
 
     init();
-
+    
     const { data: subscription } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (event === "SIGNED_IN" && session) {
