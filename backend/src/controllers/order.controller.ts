@@ -153,13 +153,13 @@ export async function createOrder(req: Request, res: Response) {
       include: { items: true },
     });
 
-    await notify({
+    notify({
       userId: req.user!.id,
       type: "order_placed",
       title: "Order Placed",
       message: `Your order ${order.orderNumber} has been placed successfully. We are finding a delivery agent for you.`,
       orderId: order.id,
-    });
+    }).catch(console.error);
 
     // Don't await — fire and forget
     broadcastOrderToAgents(order.id).catch(console.error);
