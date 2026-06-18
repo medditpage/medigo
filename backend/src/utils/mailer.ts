@@ -1,3 +1,4 @@
+// utils/mailer.ts
 import nodemailer, { Transporter } from "nodemailer";
 import dotenv from "dotenv";
 

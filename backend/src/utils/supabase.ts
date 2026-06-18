@@ -1,3 +1,4 @@
+//utils/ supabase.ts
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import dotenv from "dotenv";
 

@@ -1,4 +1,4 @@
-//api.ts
+//frontend/src/lib/api.ts
 import axios from "axios";
 import { supabase } from "./supabase";
 

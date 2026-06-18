@@ -1,5 +1,5 @@
 "use client";
-
+// (auth)/login/page.tsx
 import { useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
@@ -92,6 +92,14 @@ export default function LoginPage() {
               >
                 {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
+            </div>
+            <div className="mt-2 text-right">
+              <Link
+                href="/forgot-password"
+                className="text-sm font-medium text-sky-600 hover:underline"
+              >
+                Forgot Password?
+              </Link>
             </div>
           </div>
 
