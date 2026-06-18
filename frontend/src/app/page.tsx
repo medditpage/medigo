@@ -1,5 +1,5 @@
 "use client";
-
+// app/page.tsx
 import Link from "next/link";
 import { useLanguage } from "@/hooks/useLanguage";
 import LanguageToggle from "@/components/LanguageToggle";
