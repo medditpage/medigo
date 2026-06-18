@@ -1,3 +1,4 @@
+// patient.routes.ts
 import { Router } from "express";
 import { authenticate } from "../middleware/auth";
 import { roleGuard } from "../middleware/roleGuard";

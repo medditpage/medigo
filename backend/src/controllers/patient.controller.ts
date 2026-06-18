@@ -80,6 +80,8 @@ export async function createAddress(req: Request, res: Response) {
       isDefault,
     } = req.body;
 
+    console.log("createAddress payload:", JSON.stringify(req.body));
+
     if (!addressLine || !city || !state || !pincode) {
       return res.status(400).json({ error: "Missing required address fields" });
     }

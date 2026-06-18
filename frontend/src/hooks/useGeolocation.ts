@@ -1,5 +1,5 @@
 "use client";
-
+//useGeolocation.ts
 import { useState, useCallback } from "react";
 
 interface GeolocationState {

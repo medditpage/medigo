@@ -1,5 +1,5 @@
 'use client';
-
+// /app/(patient)/profile/page.tsx
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useLanguage } from '@/hooks/useLanguage';
