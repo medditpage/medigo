@@ -45,7 +45,13 @@ export async function authenticate(
 
     const token = authHeader.replace("Bearer ", "").trim();
 
+    console.log("TOKEN LENGTH:", token.length);
+    console.log("SUPABASE_URL:", process.env.SUPABASE_URL);
+    console.log("ANON_KEY EXISTS:", !!process.env.SUPABASE_ANON_KEY);
+
     const { data, error } = await supabaseAuthClient.auth.getUser(token);
+    console.log("AUTH ERROR:", JSON.stringify(error));
+    console.log("AUTH USER:", data?.user?.id);
 
     if (error || !data?.user) {
       return res.status(401).json({ error: "Invalid or expired token" });
