@@ -18,9 +18,9 @@ const NOTIFICATION_TEMPLATES: Record<
   { title: string; body: (msg: string) => string }
 > = {
   registration: {
-    title: "Welcome to MediGo!",
+    title: "Welcome to Medzink!",
     body: (msg) =>
-      `<p>${msg}</p><p>Thank you for joining MediGo, your trusted medicine delivery partner.</p>`,
+      `<p>${msg}</p><p>Thank you for joining Medzink, your trusted medicine delivery partner.</p>`,
   },
   order_placed: {
     title: "Order Placed Successfully",
@@ -44,7 +44,7 @@ const NOTIFICATION_TEMPLATES: Record<
   delivered: {
     title: "Order Delivered",
     body: (msg) =>
-      `<p>${msg}</p><p>Thank you for using MediGo. Please rate your delivery experience.</p>`,
+      `<p>${msg}</p><p>Thank you for using Medzink. Please rate your delivery experience.</p>`,
   },
   complaint: {
     title: "Complaint Update",
@@ -82,7 +82,7 @@ export async function notify(params: NotifyParams): Promise<void> {
 
   const result = await sendMail({
     to: user.email,
-    subject: `${emailTitle} - MediGo`,
+    subject: `${emailTitle} - Medzink`,
     html,
   });
 

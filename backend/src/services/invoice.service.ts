@@ -39,7 +39,7 @@ function buildInvoiceHtml(data: InvoiceData): string {
   <head><meta charset="utf-8" /><title>Invoice ${data.invoiceNumber}</title></head>
   <body style="font-family: Arial, sans-serif; color:#0f172a; padding: 24px; max-width: 700px; margin: 0 auto;">
     <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #0ea5e9;padding-bottom:16px;">
-      <h1 style="color:#0ea5e9;margin:0;">MediGo</h1>
+      <h1 style="color:#0ea5e9;margin:0;">Medzink</h1>
       <div style="text-align:right;">
         <p style="margin:0;font-weight:bold;">Invoice #${data.invoiceNumber}</p>
         <p style="margin:0;font-size:12px;color:#64748b;">Order #${data.orderNumber}</p>
@@ -79,7 +79,7 @@ function buildInvoiceHtml(data: InvoiceData): string {
     </table>
 
     <p style="margin-top:24px;font-size:12px;color:#94a3b8;text-align:center;">
-      This is a computer-generated invoice from MediGo. Payment Mode: Cash on Delivery.
+      This is a computer-generated invoice from Medzink. Payment Mode: Cash on Delivery.
     </p>
   </body>
   </html>`;
@@ -94,7 +94,7 @@ function buildInvoicePdf(data: InvoiceData): Promise<Buffer> {
     doc.on("end", () => resolve(Buffer.concat(chunks)));
     doc.on("error", reject);
 
-    doc.fillColor("#0ea5e9").fontSize(22).text("MediGo", { continued: false });
+    doc.fillColor("#0ea5e9").fontSize(22).text("Medzink", { continued: false });
     doc.fillColor("#0f172a").fontSize(10);
     doc.text(`Invoice #${data.invoiceNumber}`, { align: "right" });
     doc.text(`Order #${data.orderNumber}`, { align: "right" });
@@ -173,7 +173,7 @@ function buildInvoicePdf(data: InvoiceData): Promise<Buffer> {
     doc.moveDown(4);
     doc.fontSize(8).fillColor("#94a3b8").font("Helvetica");
     doc.text(
-      "This is a computer-generated invoice from MediGo. Payment Mode: Cash on Delivery.",
+      "This is a computer-generated invoice from Medzink. Payment Mode: Cash on Delivery.",
       50,
       doc.y,
       {
@@ -220,7 +220,7 @@ export async function generateInvoice(
     orderNumber: order.orderNumber,
     patientName: order.patient.fullName,
     patientAddress: `${order.address.addressLine}, ${order.address.city}, ${order.address.state} - ${order.address.pincode}`,
-    storeName: order.store?.name ?? "MediGo Partner Store",
+    storeName: order.store?.name ?? "Medzink Partner Store",
     items: order.items.map((item) => ({
       name: item.medicineName,
       quantity: item.quantity,

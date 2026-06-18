@@ -6,7 +6,7 @@ dotenv.config();
 
 const GMAIL_USER = process.env.GMAIL_USER as string;
 const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD as string;
-const APP_NAME = process.env.APP_NAME || "MediGo";
+const APP_NAME = process.env.APP_NAME || "Medzink";
 
 let transporter: Transporter | null = null;
 

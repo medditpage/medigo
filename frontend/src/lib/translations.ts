@@ -1,6 +1,6 @@
 export const translations = {
   en: {
-    appName: "MediGo",
+    appName: "Medzink",
     tagline: "Medicines delivered to your doorstep, fast and reliable",
     login: "Login",
     register: "Register",
@@ -156,7 +156,7 @@ export const translations = {
     resolved: "Resolved",
   },
   hi: {
-    appName: "मेडीगो",
+    appName: "मेडजिंक",
     tagline: "दवाइयाँ आपके घर तक, तेज़ और भरोसेमंद",
     login: "लॉगिन",
     register: "रजिस्टर करें",

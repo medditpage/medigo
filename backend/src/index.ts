@@ -23,7 +23,7 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(morgan('dev'));
 app.get('/health', (_req: Request, res: Response) => {
-res.json({ status: 'ok', service: 'MediGo API', timestamp: new Date().toISOString() });
+res.json({ status: 'ok', service: 'Medzink API', timestamp: new Date().toISOString() });
 });
 app.use('/api/auth', authRoutes);
 app.use('/api/patient', patientRoutes);
@@ -40,7 +40,7 @@ error: err.message || 'Internal server error',
 });
 });
 app.listen(PORT, () => {
-console.log(`MediGo backend running on port ${PORT}`);
+console.log(`Medzink backend running on port ${PORT}`);
 startCronJobs();
 });
 export default app;

@@ -90,8 +90,8 @@ export async function registerPatient(req: Request, res: Response) {
     await notify({
       userId: data.user.id,
       type: "registration",
-      title: "Welcome to MediGo",
-      message: `Hi ${fullName}, your MediGo account has been created successfully.`,
+      title: "Welcome to Medzink",
+      message: `Hi ${fullName}, your Medzink account has been created successfully.`,
     });
 
     return res.status(201).json({
