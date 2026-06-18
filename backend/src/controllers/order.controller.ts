@@ -42,11 +42,9 @@ export async function createOrder(req: Request, res: Response) {
       orderMethod === "prescription" &&
       (!prescriptionImageUrls || prescriptionImageUrls.length === 0)
     ) {
-      return res
-        .status(400)
-        .json({
-          error: "prescriptionImageUrls is required for prescription orders",
-        });
+      return res.status(400).json({
+        error: "prescriptionImageUrls is required for prescription orders",
+      });
     }
 
     if (orderMethod === "manual" && (!items || items.length === 0)) {
@@ -63,12 +61,10 @@ export async function createOrder(req: Request, res: Response) {
     }
 
     if (address.latitude == null || address.longitude == null) {
-      return res
-        .status(400)
-        .json({
-          error:
-            'Selected address does not have GPS coordinates set. Please edit the address and use "Use my current location" to add coordinates.',
-        });
+      return res.status(400).json({
+        error:
+          'Selected address does not have GPS coordinates set. Please edit the address and use "Use my current location" to add coordinates.',
+      });
     }
 
     if (familyMemberId) {
@@ -165,15 +161,13 @@ export async function createOrder(req: Request, res: Response) {
       orderId: order.id,
     });
 
-    const broadcastResult = await broadcastOrderToAgents(order.id);
+    // Don't await — fire and forget
+    broadcastOrderToAgents(order.id).catch(console.error);
 
     return res.status(201).json({
       order,
-      agentsNotified: broadcastResult.broadcastCount,
-      message:
-        broadcastResult.broadcastCount === 0
-          ? "Order placed. No agents online currently — admin will assign one shortly."
-          : `Order placed and ${broadcastResult.broadcastCount} agent(s) notified.`,
+      agentsNotified: 0,
+      message: "Order placed successfully.",
     });
   } catch (err: any) {
     console.error("createOrder error:", err);
