@@ -149,7 +149,7 @@ export default function NewOrderPage() {
       }
 
       const { data } = await api.post("/orders", payload);
-      router.push(`/orders/${data.order.id}`);
+      router.push("/orders");
     } catch (err) {
       setError(getErrorMessage(err));
     } finally {

@@ -263,8 +263,8 @@ export default function OrderDetailPage() {
         <div className="flex items-center gap-2 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-700">
           <Loader2 size={16} className="animate-spin" />
           {language === "hi"
-            ? "एजेंट खोजा जा रहा है... कृपया प्रतीक्षा करें।"
-            : "Finding a delivery agent nearby... Please wait."}
+            ? "एजेंट खोजा जा रहा है... कृपया प्रतीक्षा 2 मिनट करें।"
+            : "Finding a delivery agent nearby... Please wait for 2 minutes "}
         </div>
       )}
 
