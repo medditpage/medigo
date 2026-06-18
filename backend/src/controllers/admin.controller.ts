@@ -8,7 +8,7 @@ async function logAudit(
   actorRole: "admin",
   action: string,
   entityType: string,
-  entityId: string,
+  entityId: string | null,
   oldValue: any = null,
   newValue: any = null,
 ) {
@@ -374,8 +374,8 @@ export async function createStore(req: Request, res: Response) {
         latitude,
         longitude,
         licenseNumber: licenseNumber ?? null,
-        opensAt: opensAt ?? null,
-        closesAt: closesAt ?? null,
+        opensAt: opensAt ? new Date(`1970-01-01T${opensAt}:00.000Z`) : null,
+        closesAt: closesAt ? new Date(`1970-01-01T${closesAt}:00.000Z`) : null,
         isActive: true,
       },
     });
@@ -425,8 +425,20 @@ export async function updateStore(req: Request, res: Response) {
           ? { licenseNumber: data.licenseNumber }
           : {}),
         ...(data.isActive !== undefined ? { isActive: data.isActive } : {}),
-        ...(data.opensAt !== undefined ? { opensAt: data.opensAt } : {}),
-        ...(data.closesAt !== undefined ? { closesAt: data.closesAt } : {}),
+        ...(data.opensAt !== undefined
+          ? {
+              opensAt: data.opensAt
+                ? new Date(`1970-01-01T${data.opensAt}:00.000Z`)
+                : null,
+            }
+          : {}),
+        ...(data.closesAt !== undefined
+          ? {
+              closesAt: data.closesAt
+                ? new Date(`1970-01-01T${data.closesAt}:00.000Z`)
+                : null,
+            }
+          : {}),
       },
     });
 
@@ -735,9 +747,9 @@ export async function updateAppSetting(req: Request, res: Response) {
       "admin",
       "UPDATE_APP_SETTING",
       "app_setting",
-      key,
       null,
-      setting,
+      null,
+      { key, value: String(value) },
     );
 
     return res.json({ setting });
