@@ -19,20 +19,22 @@ function getTransporter(): Transporter {
     );
   }
 
-  transporter = nodemailer.createTransport({
+  // TypeScript ke strict check ko bypass karne ke liye humne isko 'any' type de diya hai
+  const smtpConfig: any = {
     host: "smtp.gmail.com",
-    port: 465, // <-- Wapas 465 kar diya
-    secure: true, // <-- 465 ke liye true hona chahiye
+    port: 465,
+    secure: true,
     auth: {
       user: GMAIL_USER,
       pass: GMAIL_APP_PASSWORD,
     },
-    family: 4, // <-- 🚀 THE MAGIC FIX: Ye Railway ko IPv4 use karne pe force karega
-  });
+    family: 4, // Railway IPv4 fix
+  };
+
+  transporter = nodemailer.createTransport(smtpConfig);
 
   return transporter;
 }
-
 interface SendMailOptions {
   to: string;
   subject: string;
