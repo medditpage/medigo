@@ -86,17 +86,21 @@ export async function notify(params: NotifyParams): Promise<void> {
     html,
   });
 
-  await prisma.emailLog.create({
-    data: {
-      userId,
-      toEmail: user.email,
-      subject: emailTitle,
-      body: emailBody,
-      notificationType: type,
-      status: result.success ? "sent" : "failed",
-      errorMessage: result.error ?? null,
-    },
-  });
+  try {
+    await prisma.emailLog.create({
+      data: {
+        userId,
+        toEmail: user.email,
+        subject: emailTitle,
+        body: emailBody,
+        notificationType: type,
+        status: result.success ? "sent" : "failed",
+        errorMessage: result.error ?? null,
+      },
+    });
+  } catch (e) {
+    console.error("EmailLog create failed:", e);
+  }
 }
 
 export async function notifyAdmins(
