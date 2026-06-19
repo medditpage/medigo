@@ -87,12 +87,12 @@ export async function registerPatient(req: Request, res: Response) {
       },
     });
 
-    await notify({
+    notify({
       userId: data.user.id,
       type: "registration",
       title: "Welcome to Medzink",
       message: `Hi ${fullName}, your Medzink account has been created successfully.`,
-    });
+    }).catch(console.error);
 
     return res.status(201).json({
       message: "Patient registered successfully",
@@ -267,12 +267,12 @@ export async function registerAgent(req: Request, res: Response) {
       },
     });
 
-    await notify({
+    notify({
       userId: data.user.id,
       type: "registration",
       title: "Agent Registration Received",
       message: `Hi ${fullName}, your delivery agent application has been received and is pending admin approval.`,
-    });
+    }).catch(console.error);
 
     return res.status(201).json({
       message: "Agent registration submitted. Awaiting admin approval.",
