@@ -24,7 +24,7 @@ export default function ProfilePage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  const [profileForm, setProfileForm] = useState({ fullName: "", mobile: "" });
+  const [profileForm, setProfileForm] = useState({ fullName: "" });
   const [savingProfile, setSavingProfile] = useState(false);
 
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -53,7 +53,7 @@ export default function ProfilePage() {
 
   useEffect(() => {
     if (user) {
-      setProfileForm({ fullName: user.fullName, mobile: user.mobile });
+      setProfileForm({ fullName: user.fullName });
     }
     fetchAddresses();
   }, [user]);
@@ -182,18 +182,21 @@ export default function ProfilePage() {
           <label className="mb-1 block text-sm font-medium text-slate-700">
             {t.mobile}
           </label>
-          <input
-            type="tel"
-            value={profileForm.mobile}
-            onChange={(e) =>
-              setProfileForm((p) => ({
-                ...p,
-                mobile: e.target.value.replace(/\D/g, "").slice(0, 10),
-              }))
-            }
-            className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
-            required
-          />
+          <div className="flex items-center gap-2">
+            <input
+              type="tel"
+              value={user?.mobile || ""}
+              disabled
+              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-400"
+            />
+            <span className="flex items-center gap-1 whitespace-nowrap rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-600">
+              <CheckCircle2 size={12} />
+              Verified
+            </span>
+          </div>
+          <p className="mt-1 text-xs text-slate-400">
+            Mobile number cannot be changed after verification
+          </p>
         </div>
 
         <div>

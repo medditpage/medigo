@@ -33,6 +33,17 @@ export async function registerPatient(req: Request, res: Response) {
       return res.status(400).json({ error: "Missing required fields" });
     }
 
+    // ✅ CHECK: Mobile must be OTP verified before registration
+    const otpRecord = await prisma.otpVerification.findFirst({
+      where: { mobile, purpose: "registration", verified: true },
+      orderBy: { createdAt: "desc" },
+    });
+    if (!otpRecord) {
+      return res.status(403).json({
+        error: "Mobile number not verified. Please verify OTP first",
+      });
+    }
+
     const existing = await prisma.user.findFirst({
       where: { OR: [{ email }, { mobile }] },
     });
@@ -70,6 +81,7 @@ export async function registerPatient(req: Request, res: Response) {
         mobile,
         email,
         language: language || "en",
+        mobileVerified: true, // ✅ Mark mobile as verified
       },
     });
 
@@ -147,6 +159,17 @@ export async function registerAgent(req: Request, res: Response) {
       return res.status(400).json({ error: "Aadhaar image is required" });
     }
 
+    // ✅ CHECK: Mobile must be OTP verified before registration
+    const otpRecord = await prisma.otpVerification.findFirst({
+      where: { mobile, purpose: "registration", verified: true },
+      orderBy: { createdAt: "desc" },
+    });
+    if (!otpRecord) {
+      return res.status(403).json({
+        error: "Mobile number not verified. Please verify OTP first",
+      });
+    }
+
     const existingUser = await prisma.user.findFirst({
       where: { OR: [{ email }, { mobile }] },
     });
@@ -160,14 +183,11 @@ export async function registerAgent(req: Request, res: Response) {
       where: { aadhaarNumber },
     });
     if (existingAgent) {
-      return res
-        .status(409)
-        .json({
-          error: "An agent with this Aadhaar number is already registered",
-        });
+      return res.status(409).json({
+        error: "An agent with this Aadhaar number is already registered",
+      });
     }
 
-    // Upload aadhaar file using service role (bypasses RLS)
     const folder = mobile;
     const aadhaarPath = `${folder}/aadhaar-${Date.now()}`;
     const { error: aadhaarUploadError } = await supabaseAdmin.storage
@@ -187,7 +207,6 @@ export async function registerAgent(req: Request, res: Response) {
 
     const aadhaarImageUrl = aadhaarUrlData?.signedUrl || aadhaarPath;
 
-    // Upload profile photo if provided
     let profilePhotoUrl: string | null = null;
     if (profileFile) {
       const profilePath = `${folder}/profile-${Date.now()}`;
@@ -205,7 +224,6 @@ export async function registerAgent(req: Request, res: Response) {
       profilePhotoUrl = profileUrlData?.signedUrl || null;
     }
 
-    // Create auth user
     const { data, error } = await supabaseAdmin.auth.admin.createUser({
       email,
       password,
@@ -225,7 +243,6 @@ export async function registerAgent(req: Request, res: Response) {
         .json({ error: error?.message || "Failed to create account" });
     }
 
-    // Wait for trigger to create user row
     await prisma.user.upsert({
       where: { id: data.user.id },
       update: {},
@@ -236,6 +253,7 @@ export async function registerAgent(req: Request, res: Response) {
         mobile,
         email,
         language: language || "en",
+        mobileVerified: true, // ✅ Mark mobile as verified
       },
     });
 

@@ -39,12 +39,20 @@ export async function updateProfile(req: Request, res: Response) {
   try {
     const { fullName, mobile } = req.body;
 
+    // ✅ Block mobile number changes — it's locked after OTP verification
+    if (mobile) {
+      return res.status(400).json({
+        error: "Mobile number cannot be changed after verification",
+      });
+    }
+
+    if (!fullName) {
+      return res.status(400).json({ error: "fullName is required" });
+    }
+
     const updated = await prisma.user.update({
       where: { id: req.user!.id },
-      data: {
-        ...(fullName ? { fullName } : {}),
-        ...(mobile ? { mobile } : {}),
-      },
+      data: { fullName },
     });
 
     return res.json({ message: "Profile updated", user: updated });

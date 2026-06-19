@@ -3,13 +3,19 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { v4 as uuidv4 } from "uuid";
 import { useAuth } from "@/hooks/useAuth";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import LanguageToggle from "@/components/LanguageToggle";
-import api from "@/lib/api";
-import { Truck, Loader2, MapPin, CheckCircle2, Upload } from "lucide-react";
+import api, { getErrorMessage } from "@/lib/api";
+import {
+  Truck,
+  Loader2,
+  MapPin,
+  CheckCircle2,
+  Upload,
+  ShieldCheck,
+} from "lucide-react";
 
 const VEHICLE_TYPES = [
   "bicycle",
@@ -19,8 +25,10 @@ const VEHICLE_TYPES = [
   "van",
 ] as const;
 
+type Step = 1 | 2 | 3;
+
 export default function AgentRegisterPage() {
-  const { registerAgent, error } = useAuth();
+  const { error } = useAuth();
   const { t } = useLanguage();
   const {
     latitude,
@@ -31,6 +39,7 @@ export default function AgentRegisterPage() {
   } = useGeolocation();
   const router = useRouter();
 
+  const [step, setStep] = useState<Step>(1);
   const [form, setForm] = useState({
     fullName: "",
     mobile: "",
@@ -46,15 +55,17 @@ export default function AgentRegisterPage() {
   });
   const [aadhaarFile, setAadhaarFile] = useState<File | null>(null);
   const [profileFile, setProfileFile] = useState<File | null>(null);
+  const [otp, setOtp] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [otpSending, setOtpSending] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
 
   function update(field: string, value: string) {
     setForm((prev) => ({ ...prev, [field]: value }));
   }
 
-  async function handleSubmit(e: React.FormEvent) {
+  // ─── Step 1: Validate form then send OTP ───────────────────────────────────
+  async function handleSendOtp(e: React.FormEvent) {
     e.preventDefault();
     setLocalError(null);
 
@@ -71,61 +82,104 @@ export default function AgentRegisterPage() {
       "vehicleType",
       "vehicleNumber",
     ];
-
     for (const field of required) {
       if (!form[field]) {
         setLocalError(t.requiredField);
         return;
       }
     }
-
     if (form.mobile.length !== 10) {
       setLocalError("Mobile number must be 10 digits");
       return;
     }
-
     if (form.aadhaarNumber.length !== 12) {
       setLocalError("Aadhaar number must be 12 digits");
       return;
     }
-
     if (form.password.length < 6) {
       setLocalError("Password must be at least 6 characters");
       return;
     }
-
     if (!aadhaarFile) {
       setLocalError("Aadhaar card image is required");
       return;
     }
 
-    setSubmitting(true);
+    setOtpSending(true);
+    try {
+      await api.post("/auth/send-otp", {
+        mobile: form.mobile,
+        purpose: "registration",
+      });
+      setStep(2);
+    } catch (err: any) {
+      setLocalError(getErrorMessage(err));
+    } finally {
+      setOtpSending(false);
+    }
+  }
+
+  // ─── Step 2: Verify OTP then register ──────────────────────────────────────
+  async function handleVerifyAndRegister(e: React.FormEvent) {
+    e.preventDefault();
+    setLocalError(null);
+
+    if (otp.length !== 6) {
+      setLocalError("Please enter the 6-digit OTP");
+      return;
+    }
 
     setSubmitting(true);
     try {
+      // First verify OTP
+      await api.post("/auth/verify-otp", {
+        mobile: form.mobile,
+        otp,
+        purpose: "registration",
+      });
+
+      // Then register with multipart form
       const formData = new FormData();
       Object.entries(form).forEach(([key, value]) =>
         formData.append(key, value),
       );
       if (latitude) formData.append("latitude", String(latitude));
       if (longitude) formData.append("longitude", String(longitude));
-      formData.append("aadhaarFile", aadhaarFile);
+      formData.append("aadhaarFile", aadhaarFile!);
       if (profileFile) formData.append("profileFile", profileFile);
 
       await api.post("/auth/register/agent", formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
 
-      setSuccess(true);
+      setStep(3);
       setTimeout(() => router.push("/login"), 2500);
     } catch (err: any) {
-      setLocalError(err.response?.data?.error || err.message || t.error);
+      setLocalError(getErrorMessage(err));
     } finally {
       setSubmitting(false);
     }
   }
 
-  if (success) {
+  // ─── Resend OTP ────────────────────────────────────────────────────────────
+  async function handleResendOtp() {
+    setLocalError(null);
+    setOtpSending(true);
+    try {
+      await api.post("/auth/send-otp", {
+        mobile: form.mobile,
+        purpose: "registration",
+      });
+      setOtp("");
+    } catch (err: any) {
+      setLocalError(getErrorMessage(err));
+    } finally {
+      setOtpSending(false);
+    }
+  }
+
+  // ─── Success screen ────────────────────────────────────────────────────────
+  if (step === 3) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-b from-sky-50 via-white to-white px-4">
         <div className="w-full max-w-md rounded-3xl border border-slate-100 bg-white p-8 text-center shadow-xl">
@@ -151,11 +205,19 @@ export default function AgentRegisterPage() {
       <div className="w-full max-w-lg rounded-3xl border border-slate-100 bg-white p-8 shadow-xl">
         <div className="mb-6 flex flex-col items-center">
           <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-sky-500 text-white">
-            <Truck size={24} />
+            {step === 2 ? <ShieldCheck size={24} /> : <Truck size={24} />}
           </div>
           <h1 className="mt-3 text-2xl font-bold text-slate-900">
-            {t.registerAsAgent}
+            {step === 2 ? "Verify Mobile" : t.registerAsAgent}
           </h1>
+          {step === 2 && (
+            <p className="mt-1 text-sm text-slate-500">
+              OTP sent to{" "}
+              <span className="font-semibold text-slate-700">
+                +91 {form.mobile}
+              </span>
+            </p>
+          )}
         </div>
 
         {(localError || error) && (
@@ -164,230 +226,293 @@ export default function AgentRegisterPage() {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        {/* ── Step 1: Registration Form ── */}
+        {step === 1 && (
+          <form onSubmit={handleSendOtp} className="space-y-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">
+                  {t.fullName}
+                </label>
+                <input
+                  type="text"
+                  value={form.fullName}
+                  onChange={(e) => update("fullName", e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
+                  required
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">
+                  {t.mobile}
+                </label>
+                <input
+                  type="tel"
+                  value={form.mobile}
+                  onChange={(e) =>
+                    update(
+                      "mobile",
+                      e.target.value.replace(/\D/g, "").slice(0, 10),
+                    )
+                  }
+                  className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">
+                  {t.email}
+                </label>
+                <input
+                  type="email"
+                  value={form.email}
+                  onChange={(e) => update("email", e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
+                  required
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">
+                  {t.password}
+                </label>
+                <input
+                  type="password"
+                  value={form.password}
+                  onChange={(e) => update("password", e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
+                  required
+                />
+              </div>
+            </div>
+
             <div>
               <label className="mb-1 block text-sm font-medium text-slate-700">
-                {t.fullName}
+                {t.address}
               </label>
               <input
                 type="text"
-                value={form.fullName}
-                onChange={(e) => update("fullName", e.target.value)}
+                value={form.addressLine}
+                onChange={(e) => update("addressLine", e.target.value)}
                 className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
                 required
               />
             </div>
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">
+                  {t.city}
+                </label>
+                <input
+                  type="text"
+                  value={form.city}
+                  onChange={(e) => update("city", e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
+                  required
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">
+                  {t.state}
+                </label>
+                <input
+                  type="text"
+                  value={form.state}
+                  onChange={(e) => update("state", e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
+                  required
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">
+                  {t.pincode}
+                </label>
+                <input
+                  type="text"
+                  value={form.pincode}
+                  onChange={(e) =>
+                    update(
+                      "pincode",
+                      e.target.value.replace(/\D/g, "").slice(0, 6),
+                    )
+                  }
+                  className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
+                  required
+                />
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={requestLocation}
+              className="flex items-center gap-2 rounded-full border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
+            >
+              <MapPin size={16} />
+              {locLoading
+                ? t.loading
+                : latitude && longitude
+                  ? `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`
+                  : "Use my current location"}
+            </button>
+            {locError && <p className="text-xs text-rose-500">{locError}</p>}
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">
+                  {t.aadhaarNumber}
+                </label>
+                <input
+                  type="text"
+                  value={form.aadhaarNumber}
+                  onChange={(e) =>
+                    update(
+                      "aadhaarNumber",
+                      e.target.value.replace(/\D/g, "").slice(0, 12),
+                    )
+                  }
+                  className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
+                  required
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">
+                  {t.vehicleType}
+                </label>
+                <select
+                  value={form.vehicleType}
+                  onChange={(e) => update("vehicleType", e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
+                >
+                  {VEHICLE_TYPES.map((v) => (
+                    <option key={v} value={v}>
+                      {(t as any)[v]}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
             <div>
               <label className="mb-1 block text-sm font-medium text-slate-700">
-                {t.mobile}
+                {t.vehicleNumber}
               </label>
               <input
-                type="tel"
-                value={form.mobile}
+                type="text"
+                value={form.vehicleNumber}
                 onChange={(e) =>
-                  update(
-                    "mobile",
-                    e.target.value.replace(/\D/g, "").slice(0, 10),
-                  )
+                  update("vehicleNumber", e.target.value.toUpperCase())
                 }
                 className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
                 required
               />
             </div>
-          </div>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">
-                {t.email}
-              </label>
-              <input
-                type="email"
-                value={form.email}
-                onChange={(e) => update("email", e.target.value)}
-                className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
-                required
-              />
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">
+                  {t.aadhaarImage}
+                </label>
+                <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-dashed border-slate-300 px-4 py-2.5 text-sm text-slate-500 hover:bg-slate-50">
+                  <Upload size={16} />
+                  {aadhaarFile ? aadhaarFile.name : "Choose file"}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) =>
+                      setAadhaarFile(e.target.files?.[0] || null)
+                    }
+                  />
+                </label>
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">
+                  {t.profilePhoto}
+                </label>
+                <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-dashed border-slate-300 px-4 py-2.5 text-sm text-slate-500 hover:bg-slate-50">
+                  <Upload size={16} />
+                  {profileFile ? profileFile.name : "Choose file (optional)"}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) =>
+                      setProfileFile(e.target.files?.[0] || null)
+                    }
+                  />
+                </label>
+              </div>
             </div>
+
+            <button
+              type="submit"
+              disabled={otpSending}
+              className="flex w-full items-center justify-center gap-2 rounded-full bg-sky-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-sky-600 disabled:opacity-60"
+            >
+              {otpSending && <Loader2 size={16} className="animate-spin" />}
+              {otpSending ? "Sending OTP..." : "Send OTP"}
+            </button>
+          </form>
+        )}
+
+        {/* ── Step 2: OTP Entry ── */}
+        {step === 2 && (
+          <form onSubmit={handleVerifyAndRegister} className="space-y-4">
             <div>
               <label className="mb-1 block text-sm font-medium text-slate-700">
-                {t.password}
-              </label>
-              <input
-                type="password"
-                value={form.password}
-                onChange={(e) => update("password", e.target.value)}
-                className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
-                required
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">
-              {t.address}
-            </label>
-            <input
-              type="text"
-              value={form.addressLine}
-              onChange={(e) => update("addressLine", e.target.value)}
-              className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
-              required
-            />
-          </div>
-
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">
-                {t.city}
+                Enter 6-digit OTP
               </label>
               <input
                 type="text"
-                value={form.city}
-                onChange={(e) => update("city", e.target.value)}
-                className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
-                required
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">
-                {t.state}
-              </label>
-              <input
-                type="text"
-                value={form.state}
-                onChange={(e) => update("state", e.target.value)}
-                className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
-                required
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">
-                {t.pincode}
-              </label>
-              <input
-                type="text"
-                value={form.pincode}
+                value={otp}
                 onChange={(e) =>
-                  update(
-                    "pincode",
-                    e.target.value.replace(/\D/g, "").slice(0, 6),
-                  )
+                  setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))
                 }
-                className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
+                placeholder="• • • • • •"
+                className="w-full rounded-xl border border-slate-200 px-4 py-3 text-center text-2xl tracking-[0.5em] focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
+                autoFocus
                 required
               />
+              <p className="mt-1.5 text-xs text-slate-400">
+                OTP is valid for 10 minutes
+              </p>
             </div>
-          </div>
 
-          <button
-            type="button"
-            onClick={requestLocation}
-            className="flex items-center gap-2 rounded-full border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
-          >
-            <MapPin size={16} />
-            {locLoading
-              ? t.loading
-              : latitude && longitude
-                ? `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`
-                : "Use my current location"}
-          </button>
-          {locError && <p className="text-xs text-rose-500">{locError}</p>}
+            <button
+              type="submit"
+              disabled={submitting || otp.length !== 6}
+              className="flex w-full items-center justify-center gap-2 rounded-full bg-sky-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-sky-600 disabled:opacity-60"
+            >
+              {submitting && <Loader2 size={16} className="animate-spin" />}
+              {submitting ? "Submitting application..." : "Verify & Register"}
+            </button>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">
-                {t.aadhaarNumber}
-              </label>
-              <input
-                type="text"
-                value={form.aadhaarNumber}
-                onChange={(e) =>
-                  update(
-                    "aadhaarNumber",
-                    e.target.value.replace(/\D/g, "").slice(0, 12),
-                  )
-                }
-                className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
-                required
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">
-                {t.vehicleType}
-              </label>
-              <select
-                value={form.vehicleType}
-                onChange={(e) => update("vehicleType", e.target.value)}
-                className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
+            <div className="flex items-center justify-between text-sm">
+              <button
+                type="button"
+                onClick={() => {
+                  setStep(1);
+                  setLocalError(null);
+                  setOtp("");
+                }}
+                className="text-slate-500 hover:text-slate-700"
               >
-                {VEHICLE_TYPES.map((v) => (
-                  <option key={v} value={v}>
-                    {(t as any)[v]}
-                  </option>
-                ))}
-              </select>
+                ← Edit details
+              </button>
+              <button
+                type="button"
+                onClick={handleResendOtp}
+                disabled={otpSending}
+                className="font-medium text-sky-600 hover:underline disabled:opacity-50"
+              >
+                {otpSending ? "Sending..." : "Resend OTP"}
+              </button>
             </div>
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">
-              {t.vehicleNumber}
-            </label>
-            <input
-              type="text"
-              value={form.vehicleNumber}
-              onChange={(e) =>
-                update("vehicleNumber", e.target.value.toUpperCase())
-              }
-              className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
-              required
-            />
-          </div>
-
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">
-                {t.aadhaarImage}
-              </label>
-              <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-dashed border-slate-300 px-4 py-2.5 text-sm text-slate-500 hover:bg-slate-50">
-                <Upload size={16} />
-                {aadhaarFile ? aadhaarFile.name : "Choose file"}
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) => setAadhaarFile(e.target.files?.[0] || null)}
-                />
-              </label>
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">
-                {t.profilePhoto}
-              </label>
-              <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-dashed border-slate-300 px-4 py-2.5 text-sm text-slate-500 hover:bg-slate-50">
-                <Upload size={16} />
-                {profileFile ? profileFile.name : "Choose file (optional)"}
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) => setProfileFile(e.target.files?.[0] || null)}
-                />
-              </label>
-            </div>
-          </div>
-
-          <button
-            type="submit"
-            disabled={submitting}
-            className="flex w-full items-center justify-center gap-2 rounded-full bg-sky-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-sky-600 disabled:opacity-60"
-          >
-            {submitting && <Loader2 size={16} className="animate-spin" />}
-            {t.register}
-          </button>
-        </form>
+          </form>
+        )}
 
         <p className="mt-6 text-center text-sm text-slate-500">
           {t.alreadyHaveAccount}{" "}

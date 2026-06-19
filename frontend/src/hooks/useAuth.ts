@@ -12,10 +12,12 @@ export function useAuth() {
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
-  const fetchProfile = useCallback(async () => {
+  const fetchProfile = useCallback(async (token?: string) => {
     try {
-      const { data } = await api.get("/auth/me");
-      // The backend returns { user } which includes addresses and deliveryAgent
+      const config = token
+        ? { headers: { Authorization: `Bearer ${token}` } }
+        : {};
+      const { data } = await api.get("/auth/me", config);
       setUser(data.user);
       return data.user as User;
     } catch (err) {
@@ -28,14 +30,24 @@ export function useAuth() {
     let mounted = true;
 
     const init = async () => {
-      const { data } = await supabase.auth.getSession();
-      if (data.session) {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (session) {
         await fetchProfile();
+      } else {
+        // Try refresh — critical for mobile where session cookie may not be loaded yet
+        const {
+          data: { session: refreshed },
+        } = await supabase.auth.refreshSession();
+        if (refreshed) {
+          await fetchProfile();
+        }
       }
+
       if (mounted) setLoading(false);
     };
-
-    init();
     
     const { data: subscription } = supabase.auth.onAuthStateChange(
       async (event, session) => {
@@ -76,7 +88,8 @@ export function useAuth() {
         return { success: false, error: "Login failed" };
       }
 
-      const profile = await fetchProfile();
+      // Pass token directly — don't rely on getSession() which fails on mobile
+      const profile = await fetchProfile(data.session.access_token);
 
       if (!profile) {
         setError("Failed to load user profile");

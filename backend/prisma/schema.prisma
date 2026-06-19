@@ -117,6 +117,7 @@ model User {
   email     String   @unique
   language  String   @default("en")
   isBanned  Boolean  @default(false) @map("is_banned")
+  mobileVerified  Boolean  @default(false) @map("mobile_verified")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -484,4 +485,16 @@ model AuditLog {
   actor User? @relation(fields: [actorId], references: [id])
 
   @@map("audit_logs")
+}
+model OtpVerification {
+  id        String   @id @default(uuid()) @db.Uuid
+  mobile    String
+  otp       String
+  purpose   String   @default("registration")
+  verified  Boolean  @default(false)
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([mobile])
+  @@map("otp_verifications")
 }

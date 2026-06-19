@@ -7,4 +7,5 @@ export function createClient() {
   );
 }
 
+// Always call createClient() fresh — don't use a singleton
 export const supabase = createClient();

@@ -9,12 +9,23 @@ const api = axios.create({
   },
 });
 
+// lib/api.ts
 api.interceptors.request.use(async (config) => {
-  const { data } = await supabase.auth.getSession();
-  const token = data.session?.access_token;
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
 
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+  if (session?.access_token) {
+    config.headers.Authorization = `Bearer ${session.access_token}`;
+    return config;
+  }
+
+  // Session missing — try to refresh (fixes mobile)
+  const {
+    data: { session: refreshed },
+  } = await supabase.auth.refreshSession();
+  if (refreshed?.access_token) {
+    config.headers.Authorization = `Bearer ${refreshed.access_token}`;
   }
 
   return config;

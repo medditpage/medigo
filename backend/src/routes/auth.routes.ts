@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { sendOtp, verifyOtp } from "../controllers/otp.controller";
 import {
   registerPatient,
   registerAgent,
@@ -26,5 +27,7 @@ router.post(
 );
 router.get("/me", authenticate, getMe);
 router.patch("/language", authenticate, updateLanguage);
+router.post("/send-otp", sendOtp);
+router.post("/verify-otp", verifyOtp);
 
 export default router;
