@@ -20,11 +20,16 @@ function getTransporter(): Transporter {
   }
 
   transporter = nodemailer.createTransport({
-    // host: "smtp-relay.brevo.com", <-- Isko hata do
-    service: "gmail", // <-- Ye daal do
+    host: "smtp.gmail.com",
+    port: 465, // Explicitly using secure port
+    secure: true, // Use SSL/TLS
     auth: {
       user: GMAIL_USER,
       pass: GMAIL_APP_PASSWORD,
+    },
+    tls: {
+      // Cloud servers (jaise Railway) par timeout/certificate errors rokne ke liye
+      rejectUnauthorized: false,
     },
   });
 
