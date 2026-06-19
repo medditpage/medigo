@@ -15,9 +15,8 @@ async function sendSms(mobile: string, otp: string): Promise<void> {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      route: "q",
-      message: `Your MediGo OTP is ${otp}. Valid for 10 minutes. Do not share with anyone.`,
-      language: "english",
+      route: "otp", // 'q' hata kar 'otp' likho
+      variables_values: otp, // Custom message hata kar sirf variables_values use karo
       numbers: mobile,
     }),
   });
