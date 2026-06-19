@@ -118,6 +118,7 @@ model User {
   language  String   @default("en")
   isBanned  Boolean  @default(false) @map("is_banned")
   mobileVerified  Boolean  @default(false) @map("mobile_verified")
+  emailVerified   Boolean  @default(false) @map("email_verified")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -488,7 +489,8 @@ model AuditLog {
 }
 model OtpVerification {
   id        String   @id @default(uuid()) @db.Uuid
-  mobile    String
+  mobile    String?  // <--- Isko optional kar diya (question mark lagaya)
+  email     String?  // <--- YE NAYI LINE ADD KI
   otp       String
   purpose   String   @default("registration")
   verified  Boolean  @default(false)
@@ -496,5 +498,6 @@ model OtpVerification {
   createdAt DateTime @default(now()) @map("created_at")
 
   @@index([mobile])
+  @@index([email])   // <--- Email ka index bhi add kar diya fast search ke liye
   @@map("otp_verifications")
 }

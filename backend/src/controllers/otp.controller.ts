@@ -1,34 +1,6 @@
 import { Request, Response } from "express";
 import { prisma } from "../utils/prisma";
-
-// ─── SMS sender ───────────────────────────────────────────────────────────────
-async function sendSms(mobile: string, otp: string): Promise<void> {
-  if (!process.env.FAST2SMS_API_KEY) {
-    console.log(`📱 OTP for ${mobile}: ${otp}`);
-    return;
-  }
-
-  const response = await fetch("https://www.fast2sms.com/dev/bulkV2", {
-    method: "POST",
-    headers: {
-      authorization: process.env.FAST2SMS_API_KEY,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      route: "otp", // 'q' hata kar 'otp' likho
-      variables_values: otp, // Custom message hata kar sirf variables_values use karo
-      numbers: mobile,
-    }),
-  });
-
-  const raw = await response.text();
-  console.log("Fast2SMS raw response:", raw);
-  const result = JSON.parse(raw) as { return: boolean; message?: string[] };
-  if (!result.return) {
-    throw new Error(result.message?.[0] || "Failed to send SMS");
-  }
-}
-// ─────────────────────────────────────────────────────────────────────────────
+import { sendMail, wrapEmailTemplate } from "../utils/mailer";
 
 function generateOtp(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
@@ -36,31 +8,33 @@ function generateOtp(): string {
 
 export async function sendOtp(req: Request, res: Response) {
   try {
-    const { mobile, purpose = "registration" } = req.body;
+    // Frontend se ab hum 'email' receive karenge (mobile ki jagah)
+    const { email, purpose = "registration" } = req.body;
 
-    if (!mobile) {
-      return res.status(400).json({ error: "Mobile number is required" });
+    if (!email) {
+      return res.status(400).json({ error: "Email address is required" });
     }
 
-    const mobileRegex = /^[6-9]\d{9}$/;
-    if (!mobileRegex.test(mobile)) {
-      return res.status(400).json({ error: "Invalid Indian mobile number" });
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ error: "Invalid email address" });
     }
 
     if (purpose === "registration") {
       const existing = await prisma.user.findUnique({
-        where: { mobile },
-        select: { mobileVerified: true },
+        where: { email },
+        select: { id: true }, // <--- emailVerified ko hatakar id kar diya
       });
       if (existing) {
-        return res.status(409).json({
-          error: "Mobile number already registered",
-        });
+        return res
+          .status(409)
+          .json({ error: "Email address already registered" });
       }
     }
 
+    // Purane OTPs invalidate karo
     await prisma.otpVerification.updateMany({
-      where: { mobile, purpose, verified: false },
+      where: { email, purpose, verified: false },
       data: { verified: true },
     });
 
@@ -68,20 +42,37 @@ export async function sendOtp(req: Request, res: Response) {
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
     const otpRecord = await prisma.otpVerification.create({
-      data: { mobile, otp, purpose, expiresAt },
+      data: { email, otp, purpose, expiresAt },
     });
 
     try {
-      await sendSms(mobile, otp);
-    } catch (smsErr: any) {
+      // Tumhara custom email template use karke mail bhejna
+      const title = "Your OTP Verification Code";
+      const bodyHtml = `
+        <p>Hello,</p>
+        <p>Your verification code for Medzink is: <br/><br/>
+        <strong style="font-size: 28px; color: #0ea5e9; letter-spacing: 4px;">${otp}</strong></p>
+        <p>This code is valid for 10 minutes. Please do not share it with anyone.</p>
+      `;
+
+      const finalHtml = wrapEmailTemplate(title, bodyHtml);
+
+      const mailResult = await sendMail({
+        to: email,
+        subject: "Medzink - Verification OTP",
+        html: finalHtml,
+      });
+
+      if (!mailResult.success) {
+        throw new Error(mailResult.error);
+      }
+    } catch (emailErr: any) {
       await prisma.otpVerification.delete({ where: { id: otpRecord.id } });
-      console.error("sendSms error:", smsErr);
-      return res
-        .status(500)
-        .json({ error: "Failed to send OTP. Please try again" });
+      console.error("sendMail error:", emailErr);
+      return res.status(500).json({ error: "Failed to send OTP to email." });
     }
 
-    return res.json({ message: "OTP sent successfully" });
+    return res.json({ message: "OTP sent successfully to your email" });
   } catch (err: any) {
     console.error("sendOtp error:", err);
     return res.status(500).json({ error: "Failed to send OTP" });
@@ -90,21 +81,21 @@ export async function sendOtp(req: Request, res: Response) {
 
 export async function verifyOtp(req: Request, res: Response) {
   try {
-    const { mobile, otp, purpose = "registration" } = req.body;
+    const { email, otp, purpose = "registration" } = req.body;
 
-    if (!mobile || !otp) {
-      return res.status(400).json({ error: "Mobile and OTP are required" });
+    if (!email || !otp) {
+      return res.status(400).json({ error: "Email and OTP are required" });
     }
 
     const record = await prisma.otpVerification.findFirst({
-      where: { mobile, purpose, verified: false },
+      where: { email, purpose, verified: false },
       orderBy: { createdAt: "desc" },
     });
 
     if (!record) {
       return res
         .status(400)
-        .json({ error: "No active OTP found for this number" });
+        .json({ error: "No active OTP found for this email" });
     }
 
     if (new Date() > record.expiresAt) {
@@ -123,7 +114,7 @@ export async function verifyOtp(req: Request, res: Response) {
     });
 
     return res.json({
-      message: "Mobile verified successfully",
+      message: "Email verified successfully",
       verified: true,
     });
   } catch (err: any) {

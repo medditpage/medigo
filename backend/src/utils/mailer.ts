@@ -20,9 +20,8 @@ function getTransporter(): Transporter {
   }
 
   transporter = nodemailer.createTransport({
-    host: "smtp-relay.brevo.com",
-    port: 587,
-    secure: false,
+    // host: "smtp-relay.brevo.com", <-- Isko hata do
+    service: "gmail", // <-- Ye daal do
     auth: {
       user: GMAIL_USER,
       pass: GMAIL_APP_PASSWORD,

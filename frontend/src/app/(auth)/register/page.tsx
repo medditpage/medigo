@@ -80,8 +80,9 @@ export default function PatientRegisterPage() {
 
     setOtpSending(true);
     try {
+      // 🔴 UPDATE: Changed 'mobile' to 'email' for the backend API
       await api.post("/auth/send-otp", {
-        mobile: form.mobile,
+        email: form.email,
         purpose: "registration",
       });
       setStep(2);
@@ -104,9 +105,9 @@ export default function PatientRegisterPage() {
 
     setSubmitting(true);
     try {
-      // First verify OTP
+      // 🔴 UPDATE: Changed 'mobile' to 'email' to match backend
       await api.post("/auth/verify-otp", {
-        mobile: form.mobile,
+        email: form.email,
         otp,
         purpose: "registration",
       });
@@ -132,8 +133,9 @@ export default function PatientRegisterPage() {
     setLocalError(null);
     setOtpSending(true);
     try {
+      // 🔴 UPDATE: Changed 'mobile' to 'email'
       await api.post("/auth/send-otp", {
-        mobile: form.mobile,
+        email: form.email,
         purpose: "registration",
       });
       setOtp("");
@@ -170,15 +172,14 @@ export default function PatientRegisterPage() {
           <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-sky-500 text-white">
             {step === 2 ? <ShieldCheck size={24} /> : <Pill size={24} />}
           </div>
+          {/* 🔴 UPDATE: Changed "Verify Mobile" to "Verify Email" */}
           <h1 className="mt-3 text-2xl font-bold text-slate-900">
-            {step === 2 ? "Verify Mobile" : t.registerAsPatient}
+            {step === 2 ? "Verify Email" : t.registerAsPatient}
           </h1>
           {step === 2 && (
             <p className="mt-1 text-sm text-slate-500">
-              OTP sent to{" "}
-              <span className="font-semibold text-slate-700">
-                +91 {form.mobile}
-              </span>
+              OTP sent to {/* 🔴 UPDATE: Show email instead of mobile number */}
+              <span className="font-semibold text-slate-700">{form.email}</span>
             </p>
           )}
         </div>
