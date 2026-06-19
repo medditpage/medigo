@@ -21,14 +21,15 @@ function getTransporter(): Transporter {
 
   transporter = nodemailer.createTransport({
     host: "smtp.gmail.com",
-    port: 465, // Explicitly using secure port
-    secure: true, // Use SSL/TLS
+    port: 587, // <-- 465 ki jagah 587 use karo
+    secure: false, // <-- 587 ke liye isko 'false' rakhna zaroori hai
+    requireTLS: true, // <-- Ye connection ko secure banayega
     auth: {
       user: GMAIL_USER,
       pass: GMAIL_APP_PASSWORD,
     },
     tls: {
-      // Cloud servers (jaise Railway) par timeout/certificate errors rokne ke liye
+      ciphers: "SSLv3",
       rejectUnauthorized: false,
     },
   });
