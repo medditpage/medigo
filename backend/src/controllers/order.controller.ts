@@ -425,3 +425,50 @@ export async function rateOrder(req: Request, res: Response) {
     return res.status(500).json({ error: "Failed to submit rating" });
   }
 }
+
+export async function getChargePreview(req: Request, res: Response) {
+  try {
+    const { addressId, isUrgent } = req.query;
+
+    if (!addressId) {
+      return res.status(400).json({ error: "addressId is required" });
+    }
+
+    const address = await prisma.address.findUnique({
+      where: { id: addressId as string },
+    });
+
+    if (!address || address.userId !== req.user!.id) {
+      return res.status(404).json({ error: "Address not found" });
+    }
+
+    if (address.latitude == null || address.longitude == null) {
+      return res.status(400).json({ error: "Address has no GPS coordinates" });
+    }
+
+    const nearestStores = await prisma.$queryRaw<NearestStoreRow[]>`
+      SELECT id, name, ROUND((ST_Distance(
+        location,
+        ST_SetSRID(ST_MakePoint(${address.longitude}::double precision, ${address.latitude}::double precision), 4326)::geography
+      ) / 1000)::numeric, 2) AS distance_km
+      FROM medical_stores
+      WHERE is_active = TRUE AND location IS NOT NULL
+      ORDER BY location <-> ST_SetSRID(ST_MakePoint(${address.longitude}::double precision, ${address.latitude}::double precision), 4326)::geography
+      LIMIT 1
+    `;
+
+    const distanceKm = nearestStores[0]
+      ? Number(nearestStores[0].distance_km)
+      : 3;
+    const urgent = isUrgent === "true";
+    const chargeBreakdown = await calculateDeliveryCharge(distanceKm, urgent);
+
+    return res.json({
+      distanceKm,
+      ...chargeBreakdown,
+    });
+  } catch (err: any) {
+    console.error("getChargePreview error:", err);
+    return res.status(500).json({ error: "Failed to calculate charges" });
+  }
+}

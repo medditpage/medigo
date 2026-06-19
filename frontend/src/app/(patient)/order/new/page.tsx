@@ -46,6 +46,33 @@ export default function NewOrderPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [chargePreview, setChargePreview] = useState<{
+    baseCharge: number;
+    distanceCharge: number;
+    platformCharge: number;
+    urgentCharge: number;
+    totalDeliveryCharge: number;
+    distanceKm: number;
+  } | null>(null);
+  const [chargeLoading, setChargeLoading] = useState(false);
+
+  useEffect(() => {
+    if (!addressId) return;
+    const fetchCharges = async () => {
+      setChargeLoading(true);
+      try {
+        const { data } = await api.get(
+          `/orders/charge-preview?addressId=${addressId}&isUrgent=${isUrgent}`,
+        );
+        setChargePreview(data);
+      } catch {
+        setChargePreview(null);
+      } finally {
+        setChargeLoading(false);
+      }
+    };
+    fetchCharges();
+  }, [addressId, isUrgent]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -390,6 +417,41 @@ export default function NewOrderPage() {
           />
           {t.urgentOrder}
         </label>
+
+        {chargeLoading && (
+          <p className="text-xs text-slate-400">{t.calculatingCharges}</p>
+        )}
+
+        {chargePreview && !chargeLoading && (
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm space-y-1">
+            <p className="font-semibold text-slate-700 mb-2">
+              {t.deliveryCharges}
+            </p>
+            <div className="flex justify-between text-slate-600">
+              <span>{t.baseCharge}</span>
+              <span>₹{chargePreview.baseCharge.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between text-slate-600">
+              <span>{t.distanceCharge}</span>
+              <span>₹{chargePreview.distanceCharge.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between text-slate-600">
+              <span>{t.platformCharge}</span>
+              <span>₹{chargePreview.platformCharge.toFixed(2)}</span>
+            </div>
+            {chargePreview.urgentCharge > 0 && (
+              <div className="flex justify-between text-orange-500">
+                <span>{t.urgentCharge}</span>
+                <span>₹{chargePreview.urgentCharge.toFixed(2)}</span>
+              </div>
+            )}
+            <div className="flex justify-between font-bold text-slate-800 border-t border-slate-200 pt-2 mt-1">
+              <span>{t.totalDeliveryCharge}</span>
+              <span>₹{chargePreview.totalDeliveryCharge.toFixed(2)}</span>
+            </div>
+            <p className="text-xs text-slate-400 mt-1">{t.medicineCostNote}</p>
+          </div>
+        )}
 
         <button
           type="submit"
