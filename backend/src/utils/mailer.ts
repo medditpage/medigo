@@ -21,17 +21,13 @@ function getTransporter(): Transporter {
 
   transporter = nodemailer.createTransport({
     host: "smtp.gmail.com",
-    port: 587, // <-- 465 ki jagah 587 use karo
-    secure: false, // <-- 587 ke liye isko 'false' rakhna zaroori hai
-    requireTLS: true, // <-- Ye connection ko secure banayega
+    port: 465, // <-- Wapas 465 kar diya
+    secure: true, // <-- 465 ke liye true hona chahiye
     auth: {
       user: GMAIL_USER,
       pass: GMAIL_APP_PASSWORD,
     },
-    tls: {
-      ciphers: "SSLv3",
-      rejectUnauthorized: false,
-    },
+    family: 4, // <-- 🚀 THE MAGIC FIX: Ye Railway ko IPv4 use karne pe force karega
   });
 
   return transporter;
