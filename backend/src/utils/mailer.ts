@@ -1,40 +1,15 @@
 // utils/mailer.ts
-import nodemailer, { Transporter } from "nodemailer";
+import { Resend } from "resend";
 import dotenv from "dotenv";
 
 dotenv.config();
 
-const GMAIL_USER = process.env.GMAIL_USER as string;
-const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD as string;
+const RESEND_API_KEY = process.env.RESEND_API_KEY as string;
 const APP_NAME = process.env.APP_NAME || "Medzink";
 
-let transporter: Transporter | null = null;
+// Initialize Resend
+const resend = new Resend(RESEND_API_KEY);
 
-function getTransporter(): Transporter {
-  if (transporter) return transporter;
-
-  if (!GMAIL_USER || !GMAIL_APP_PASSWORD) {
-    throw new Error(
-      "Missing GMAIL_USER or GMAIL_APP_PASSWORD in environment variables",
-    );
-  }
-
-  // TypeScript ke strict check ko bypass karne ke liye humne isko 'any' type de diya hai
-  const smtpConfig: any = {
-    host: "smtp.gmail.com",
-    port: 465,
-    secure: true,
-    auth: {
-      user: GMAIL_USER,
-      pass: GMAIL_APP_PASSWORD,
-    },
-    family: 4, // Railway IPv4 fix
-  };
-
-  transporter = nodemailer.createTransport(smtpConfig);
-
-  return transporter;
-}
 interface SendMailOptions {
   to: string;
   subject: string;
@@ -50,17 +25,29 @@ export async function sendMail(
   options: SendMailOptions,
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const t = getTransporter();
-    await t.sendMail({
-      from: `"${APP_NAME}" <${GMAIL_USER}>`,
+    if (!RESEND_API_KEY) {
+      throw new Error("Missing RESEND_API_KEY in environment variables");
+    }
+
+    const { data, error } = await resend.emails.send({
+      // ⚠️ IMPORTANT: Apna verified domain yahan daalo
+      // Note: Agar Hostinger me DNS verify nahi hua h, toh temporarily isko 'onboarding@resend.dev' kar dena testing k liye.
+      from: `${APP_NAME} <otp@medzink.in>`,
       to: options.to,
       subject: options.subject,
       html: options.html,
       attachments: options.attachments,
     });
+
+    if (error) {
+      console.error("Resend API Error:", error);
+      return { success: false, error: error.message };
+    }
+
+    console.log(`✉️ Email OTP sent successfully via Resend to ${options.to}`);
     return { success: true };
   } catch (err: any) {
-    console.error("Failed to send email:", err.message);
+    console.error("Failed to send email via Resend:", err.message);
     return { success: false, error: err.message };
   }
 }
