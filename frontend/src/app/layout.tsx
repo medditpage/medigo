@@ -6,7 +6,7 @@ import { LanguageProvider } from "@/lib/LanguageContext";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Medzink - Medicine Delivery for Rural India",
+  title: "Medzink - Medicine Delivery for India",
   description:
     "Order medicines online and get them delivered fast by trusted local agents.",
 };
